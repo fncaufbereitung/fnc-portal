@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../models/appointment.dart';
 import '../models/autohaus_company.dart';
 import '../services/appointment_service.dart';
 import '../services/autohaus_service.dart';
@@ -18,7 +19,7 @@ class AutohausDashboardScreen extends StatefulWidget {
 }
 
 class _AutohausDashboardScreenState extends State<AutohausDashboardScreen> {
-  final _appointments = AppointmentService.instance;
+  final _appointments = AppointmentService();
   final _autohaeuser = AutohausService();
   final _companyController = TextEditingController();
   AutohausCompany? _selectedCompany;
@@ -27,155 +28,167 @@ class _AutohausDashboardScreenState extends State<AutohausDashboardScreen> {
   @override
   void initState() {
     super.initState();
-    _appointments.addListener(_refresh);
   }
 
   @override
   void dispose() {
-    _appointments.removeListener(_refresh);
     _companyController.dispose();
     super.dispose();
   }
 
-  void _refresh() => setState(() {});
-
   @override
-  Widget build(BuildContext context) {
-    final requests = _appointments.appointmentsForSession(widget.sessionId);
-    return Scaffold(
-      appBar: AppBar(
-        toolbarHeight: 76,
-        backgroundColor: FncColors.surface,
-        surfaceTintColor: Colors.transparent,
-        title: const Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            FncMark(size: 42),
-            SizedBox(width: 12),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'FNC PORTAL',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
-                ),
-                Text(
-                  'AUTOHAUS',
-                  style: TextStyle(
-                    fontSize: 9,
-                    color: FncColors.muted,
-                    letterSpacing: 1.3,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-        actions: [
-          IconButton(
-            tooltip: 'Rolle wechseln',
-            onPressed: () => Navigator.pop(context),
-            icon: const Icon(Icons.swap_horiz_rounded),
-          ),
-          const SizedBox(width: 16),
-        ],
-      ),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 1080),
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(24, 34, 24, 60),
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(
+      toolbarHeight: 76,
+      backgroundColor: FncColors.surface,
+      surfaceTintColor: Colors.transparent,
+      title: const Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          FncMark(size: 42),
+          SizedBox(width: 12),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Wrap(
-                alignment: WrapAlignment.spaceBetween,
-                crossAxisAlignment: WrapCrossAlignment.end,
-                runSpacing: 20,
-                children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Terminanfragen',
-                        style: Theme.of(context).textTheme.displaySmall,
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        _selectedCompany == null
-                            ? 'Wählen Sie ein Autohaus oder legen Sie einen neuen Eintrag an.'
-                            : 'Anfragen von ${_selectedCompany!.name} in dieser Sitzung.',
-                        style: const TextStyle(color: FncColors.muted),
-                      ),
-                    ],
-                  ),
-                  ElevatedButton.icon(
-                    onPressed: _selectedCompany == null
-                        ? null
-                        : _openNewRequest,
-                    icon: const Icon(Icons.add_rounded),
-                    label: const Text('Termin anfragen'),
-                  ),
-                ],
+              Text(
+                'FNC PORTAL',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
               ),
-              const SizedBox(height: 28),
-              _companySelectionCard(),
-              const SizedBox(height: 28),
-              Row(
-                children: [
-                  Text(
-                    'Eigene Anfragen',
-                    style: Theme.of(context).textTheme.headlineMedium,
-                  ),
-                  const Spacer(),
-                  Text(
-                    '${requests.length} Einträge',
-                    style: const TextStyle(color: FncColors.muted),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              if (requests.isEmpty)
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(42),
-                    child: Column(
-                      children: [
-                        const Icon(
-                          Icons.event_note_outlined,
-                          size: 44,
-                          color: FncColors.gold,
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'Noch keine Anfragen',
-                          style: Theme.of(context).textTheme.titleLarge,
-                        ),
-                        const SizedBox(height: 8),
-                        const Text(
-                          'Ihre in dieser Sitzung erstellten Terminanfragen erscheinen hier.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(color: FncColors.muted),
-                        ),
-                      ],
-                    ),
-                  ),
-                )
-              else
-                ...requests.map((item) => AppointmentCard(item: item)),
-              const SizedBox(height: 20),
-              Align(
-                alignment: Alignment.centerRight,
-                child: OutlinedButton.icon(
-                  onPressed: () => Navigator.pop(context),
-                  icon: const Icon(Icons.swap_horiz_rounded),
-                  label: const Text('Rolle wechseln'),
+              Text(
+                'AUTOHAUS',
+                style: TextStyle(
+                  fontSize: 9,
+                  color: FncColors.muted,
+                  letterSpacing: 1.3,
                 ),
               ),
             ],
           ),
-        ),
+        ],
       ),
-    );
-  }
+      actions: [
+        IconButton(
+          tooltip: 'Rolle wechseln',
+          onPressed: () => Navigator.pop(context),
+          icon: const Icon(Icons.swap_horiz_rounded),
+        ),
+        const SizedBox(width: 16),
+      ],
+    ),
+    body: StreamBuilder<List<Appointment>>(
+      stream: _appointments.watchForSession(widget.sessionId),
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return Center(
+            child: Text(
+              'Anfragen konnten nicht geladen werden.\n${snapshot.error}',
+              textAlign: TextAlign.center,
+            ),
+          );
+        }
+        if (!snapshot.hasData) {
+          return const Center(
+            child: CircularProgressIndicator(color: FncColors.gold),
+          );
+        }
+        final requests = snapshot.data!;
+        return Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1080),
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(24, 34, 24, 60),
+              children: [
+                Wrap(
+                  alignment: WrapAlignment.spaceBetween,
+                  crossAxisAlignment: WrapCrossAlignment.end,
+                  runSpacing: 20,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Terminanfragen',
+                          style: Theme.of(context).textTheme.displaySmall,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          _selectedCompany == null
+                              ? 'Wählen Sie ein Autohaus oder legen Sie einen neuen Eintrag an.'
+                              : 'Anfragen von ${_selectedCompany!.name} in dieser Sitzung.',
+                          style: const TextStyle(color: FncColors.muted),
+                        ),
+                      ],
+                    ),
+                    ElevatedButton.icon(
+                      onPressed: _selectedCompany == null
+                          ? null
+                          : _openNewRequest,
+                      icon: const Icon(Icons.add_rounded),
+                      label: const Text('Termin anfragen'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 28),
+                _companySelectionCard(),
+                const SizedBox(height: 28),
+                Row(
+                  children: [
+                    Text(
+                      'Eigene Anfragen',
+                      style: Theme.of(context).textTheme.headlineMedium,
+                    ),
+                    const Spacer(),
+                    Text(
+                      '${requests.length} Einträge',
+                      style: const TextStyle(color: FncColors.muted),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                if (requests.isEmpty)
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(42),
+                      child: Column(
+                        children: [
+                          const Icon(
+                            Icons.event_note_outlined,
+                            size: 44,
+                            color: FncColors.gold,
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'Noch keine Anfragen',
+                            style: Theme.of(context).textTheme.titleLarge,
+                          ),
+                          const SizedBox(height: 8),
+                          const Text(
+                            'Ihre in dieser Sitzung erstellten Terminanfragen erscheinen hier.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: FncColors.muted),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                else
+                  ...requests.map((item) => AppointmentCard(item: item)),
+                const SizedBox(height: 20),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: OutlinedButton.icon(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.swap_horiz_rounded),
+                    label: const Text('Rolle wechseln'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    ),
+  );
 
   Widget _companySelectionCard() => Card(
     child: Padding(

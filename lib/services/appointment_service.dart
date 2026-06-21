@@ -1,98 +1,59 @@
-import 'package:flutter/foundation.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../models/appointment.dart';
 
-class AppointmentService extends ChangeNotifier {
-  AppointmentService._();
+class AppointmentService {
+  AppointmentService({FirebaseFirestore? firestore})
+    : _firestore = firestore ?? FirebaseFirestore.instance;
 
-  static final AppointmentService instance = AppointmentService._();
+  final FirebaseFirestore _firestore;
 
-  final List<Appointment> _appointments = [
-    Appointment(
-      id: 'fnc-1001',
-      autohausId: 'demo-rheinblick',
-      companyName: 'Autohaus Rheinblick',
-      vehicleMake: 'Mercedes-Benz',
-      vehicleModel: 'E-Klasse',
-      licensePlate: 'K-FNC 241',
-      serviceType: 'Komplettaufbereitung',
-      desiredDate: DateTime.now().add(const Duration(days: 1)),
-      notes: 'Verkaufsfahrzeug, bitte Innenraum besonders gründlich.',
-      status: 'Bestätigt',
-    ),
-    Appointment(
-      id: 'fnc-1002',
-      autohausId: 'demo-nordstern',
-      companyName: 'Nordstern Automobile',
-      vehicleMake: 'BMW',
-      vehicleModel: 'X5',
-      licensePlate: 'D-NA 508',
-      serviceType: 'Leasingrückläufer',
-      desiredDate: DateTime.now().add(const Duration(days: 2)),
-      notes: 'Kleine Kratzer an der Ladekante prüfen.',
-      status: 'In Arbeit',
-    ),
-    Appointment(
-      id: 'fnc-1003',
-      autohausId: 'demo-direkt',
-      companyName: 'FNC Direktkunde',
-      vehicleMake: 'Audi',
-      vehicleModel: 'A6 Avant',
-      licensePlate: 'NE-FC 77',
-      serviceType: 'Innenraumaufbereitung',
-      desiredDate: DateTime.now().add(const Duration(days: 3)),
-      notes: '',
-      status: 'Angefragt',
-    ),
-  ];
+  CollectionReference<Map<String, dynamic>> get _collection =>
+      _firestore.collection('appointments');
 
-  List<Appointment> get appointments => _sorted(_appointments);
+  Stream<List<Appointment>> watchAll() => _collection
+      .orderBy('desiredAt')
+      .snapshots()
+      .map((snapshot) => snapshot.docs.map(Appointment.fromDoc).toList());
 
-  List<Appointment> appointmentsForSession(String sessionId) =>
-      _sorted(_appointments.where((item) => item.autohausId == sessionId));
+  Stream<List<Appointment>> watchForSession(String sessionId) => _collection
+      .where('autohausId', isEqualTo: sessionId)
+      .orderBy('desiredAt')
+      .snapshots()
+      .map((snapshot) => snapshot.docs.map(Appointment.fromDoc).toList());
 
-  List<Appointment> _sorted(Iterable<Appointment> source) {
-    final result = List<Appointment>.of(source);
-    result.sort((a, b) => a.desiredDate.compareTo(b.desiredDate));
-    return List.unmodifiable(result);
-  }
-
-  void create({
+  Future<void> create({
     required String ownerId,
     required String companyName,
     required String make,
     required String model,
     required String plate,
+    required String appointmentType,
     required String serviceType,
-    required DateTime desiredDate,
+    required DateTime desiredAt,
     required String notes,
-  }) {
-    _appointments.add(
-      Appointment(
-        id: DateTime.now().microsecondsSinceEpoch.toString(),
-        autohausId: ownerId,
-        companyName: companyName,
-        vehicleMake: make,
-        vehicleModel: model,
-        licensePlate: plate.toUpperCase(),
-        serviceType: serviceType,
-        desiredDate: desiredDate,
-        notes: notes,
-        status: 'Angefragt',
-      ),
-    );
-    notifyListeners();
+  }) async {
+    final ref = _collection.doc();
+    await ref.set({
+      'id': ref.id,
+      'autohausId': ownerId,
+      'companyName': companyName,
+      'vehicleMake': make,
+      'vehicleModel': model,
+      'licensePlate': plate.toUpperCase(),
+      'appointmentType': appointmentType,
+      'serviceType': serviceType,
+      'desiredAt': Timestamp.fromDate(desiredAt),
+      'notes': notes,
+      'status': 'Angefragt',
+      'createdAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
   }
 
-  void updateStatus(String id, String status) {
-    final index = _appointments.indexWhere((item) => item.id == id);
-    if (index == -1) return;
-    _appointments[index] = _appointments[index].copyWith(status: status);
-    notifyListeners();
-  }
+  Future<void> updateStatus(String id, String status) => _collection
+      .doc(id)
+      .update({'status': status, 'updatedAt': FieldValue.serverTimestamp()});
 
-  void delete(String id) {
-    _appointments.removeWhere((item) => item.id == id);
-    notifyListeners();
-  }
+  Future<void> delete(String id) => _collection.doc(id).delete();
 }

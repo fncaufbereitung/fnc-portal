@@ -30,6 +30,12 @@ class FncMark extends StatelessWidget {
 String germanDate(DateTime date) =>
     '${date.day.toString().padLeft(2, '0')}.${date.month.toString().padLeft(2, '0')}.${date.year}';
 
+String germanTime(DateTime date) =>
+    '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')} Uhr';
+
+String germanDateTime(DateTime date) =>
+    '${germanDate(date)} · ${germanTime(date)}';
+
 class AppointmentCard extends StatelessWidget {
   const AppointmentCard({
     super.key,
@@ -52,7 +58,7 @@ class AppointmentCard extends StatelessWidget {
         children: [
           Wrap(
             spacing: 12,
-            runSpacing: 8,
+            runSpacing: 12,
             alignment: WrapAlignment.spaceBetween,
             children: [
               Column(
@@ -62,10 +68,18 @@ class AppointmentCard extends StatelessWidget {
                     '${item.vehicleMake} ${item.vehicleModel}',
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 7),
                   Text(
-                    '${item.companyName} · ${item.licensePlate} · ${item.serviceType}',
+                    '${item.companyName} · ${item.licensePlate}',
                     style: const TextStyle(color: FncColors.muted),
+                  ),
+                  const SizedBox(height: 5),
+                  Text(
+                    '${item.appointmentType} · ${item.serviceType}',
+                    style: const TextStyle(
+                      color: FncColors.muted,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ],
               ),
@@ -73,9 +87,10 @@ class AppointmentCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text(
-                    germanDate(item.desiredDate),
+                    germanDateTime(item.desiredAt),
                     style: const TextStyle(fontWeight: FontWeight.w800),
                   ),
+                  const SizedBox(height: 6),
                   Text(
                     item.status,
                     style: const TextStyle(
@@ -93,8 +108,10 @@ class AppointmentCard extends StatelessWidget {
           ],
           if (onStatus != null || onDelete != null) ...[
             const Divider(height: 28),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
+            Wrap(
+              alignment: WrapAlignment.end,
+              spacing: 8,
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 if (onStatus != null)
                   SizedBox(
@@ -117,6 +134,7 @@ class AppointmentCard extends StatelessWidget {
                   ),
                 if (onDelete != null)
                   IconButton(
+                    tooltip: 'Termin löschen',
                     onPressed: onDelete,
                     icon: const Icon(Icons.delete_outline),
                   ),

@@ -8,6 +8,10 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    match /appointments/{appointmentId} {
+      allow read, create, update, delete: if true;
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }

@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:fnc_portal/services/appointment_service.dart';
+import 'package:fnc_portal/models/appointment.dart';
 import 'package:fnc_portal/services/autohaus_service.dart';
 
 void main() {
@@ -15,31 +15,34 @@ void main() {
     );
   });
 
-  test('Autohaus requests are isolated by local session', () {
-    final service = AppointmentService.instance;
-    const sessionA = 'test-session-a';
-    const sessionB = 'test-session-b';
+  test('appointments sort by desired date and time', () {
+    final later = _appointment('later', DateTime(2026, 7, 1, 14, 30));
+    final earlier = _appointment('earlier', DateTime(2026, 7, 1, 8, 15));
 
-    service.create(
-      ownerId: sessionA,
-      companyName: 'Test Autohaus A',
-      make: 'Volkswagen',
-      model: 'Passat',
-      plate: 'k test 1',
-      serviceType: 'Komplettaufbereitung',
-      desiredDate: DateTime(2026, 7, 1),
-      notes: 'Testtermin',
-    );
+    final sorted = sortAppointments([later, earlier]);
 
-    final request = service.appointmentsForSession(sessionA).single;
-    expect(request.status, 'Angefragt');
-    expect(request.licensePlate, 'K TEST 1');
-    expect(service.appointmentsForSession(sessionB), isEmpty);
+    expect(sorted.map((item) => item.id), ['earlier', 'later']);
+  });
 
-    service.updateStatus(request.id, 'Bestätigt');
-    expect(service.appointmentsForSession(sessionA).single.status, 'Bestätigt');
-
-    service.delete(request.id);
-    expect(service.appointmentsForSession(sessionA), isEmpty);
+  test('weekly grouping uses Monday through Sunday', () {
+    final reference = DateTime(2026, 6, 24);
+    expect(startOfWeek(reference), DateTime(2026, 6, 22));
+    expect(isInWeek(DateTime(2026, 6, 22, 8), reference), isTrue);
+    expect(isInWeek(DateTime(2026, 6, 28, 18), reference), isTrue);
+    expect(isInWeek(DateTime(2026, 6, 29), reference), isFalse);
   });
 }
+
+Appointment _appointment(String id, DateTime desiredAt) => Appointment(
+  id: id,
+  autohausId: 'session',
+  companyName: 'Test Autohaus',
+  vehicleMake: 'Volkswagen',
+  vehicleModel: 'Passat',
+  licensePlate: 'K-TEST 1',
+  appointmentType: 'Aufbereitung',
+  serviceType: 'Komplettaufbereitung',
+  desiredAt: desiredAt,
+  notes: '',
+  status: 'Angefragt',
+);

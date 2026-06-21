@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../models/appointment.dart';
 import '../services/appointment_service.dart';
 import '../theme.dart';
 
@@ -26,29 +27,59 @@ class _NewAppointmentScreenState extends State<NewAppointmentScreen> {
   final _model = TextEditingController();
   final _plate = TextEditingController();
   final _notes = TextEditingController();
+  final _appointments = AppointmentService();
   DateTime? _date;
-  String _serviceType = 'Komplettaufbereitung';
+  TimeOfDay? _time;
+  String _appointmentType = appointmentTypes.first;
+  String _serviceType = serviceTypes.first;
+  bool _saving = false;
 
-  void _save() {
-    if (!_key.currentState!.validate() || _date == null) {
-      if (_date == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Bitte einen Wunschtermin auswählen.')),
-        );
+  Future<void> _save() async {
+    if (!_key.currentState!.validate() || _date == null || _time == null) {
+      final missing = [
+        if (_date == null) 'Wunschdatum',
+        if (_time == null) 'Wunschzeit',
+      ].join(' und ');
+      if (missing.isNotEmpty) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Bitte $missing auswählen.')));
       }
       return;
     }
-    AppointmentService.instance.create(
-      ownerId: widget.ownerId,
-      companyName: widget.fixedCompanyName ?? _company.text.trim(),
-      make: _make.text.trim(),
-      model: _model.text.trim(),
-      plate: _plate.text.trim(),
-      serviceType: _serviceType,
-      desiredDate: _date!,
-      notes: _notes.text.trim(),
-    );
-    Navigator.pop(context);
+
+    setState(() => _saving = true);
+    try {
+      final desiredAt = DateTime(
+        _date!.year,
+        _date!.month,
+        _date!.day,
+        _time!.hour,
+        _time!.minute,
+      );
+      await _appointments.create(
+        ownerId: widget.ownerId,
+        companyName: widget.fixedCompanyName ?? _company.text.trim(),
+        make: _make.text.trim(),
+        model: _model.text.trim(),
+        plate: _plate.text.trim(),
+        appointmentType: _appointmentType,
+        serviceType: _serviceType,
+        desiredAt: desiredAt,
+        notes: _notes.text.trim(),
+      );
+      if (mounted) Navigator.pop(context);
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Termin konnte nicht gespeichert werden: $error'),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
   }
 
   @override
@@ -87,7 +118,7 @@ class _NewAppointmentScreenState extends State<NewAppointmentScreen> {
                     ),
                     const SizedBox(height: 8),
                     const Text(
-                      'Fahrzeug, Leistung und gewünschten Bearbeitungstermin eintragen.',
+                      'Fahrzeug, Terminart, Leistung sowie Wunschdatum und Wunschzeit eintragen.',
                       style: TextStyle(color: FncColors.muted),
                     ),
                     const SizedBox(height: 28),
@@ -101,29 +132,7 @@ class _NewAppointmentScreenState extends State<NewAppointmentScreen> {
                       ),
                       const SizedBox(height: 16),
                     ] else ...[
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: FncColors.gold.withValues(alpha: .08),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: FncColors.line),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(
-                              Icons.business_outlined,
-                              color: FncColors.gold,
-                            ),
-                            const SizedBox(width: 12),
-                            Text(
-                              widget.fixedCompanyName!,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+                      _SelectedCompany(name: widget.fixedCompanyName!),
                       const SizedBox(height: 16),
                     ],
                     Row(
@@ -160,50 +169,61 @@ class _NewAppointmentScreenState extends State<NewAppointmentScreen> {
                     ),
                     const SizedBox(height: 16),
                     DropdownButtonFormField<String>(
+                      initialValue: _appointmentType,
+                      decoration: const InputDecoration(labelText: 'Terminart'),
+                      items: appointmentTypes
+                          .map(
+                            (value) => DropdownMenuItem(
+                              value: value,
+                              child: Text(value),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (value) =>
+                          setState(() => _appointmentType = value!),
+                    ),
+                    const SizedBox(height: 16),
+                    DropdownButtonFormField<String>(
                       initialValue: _serviceType,
                       decoration: const InputDecoration(labelText: 'Leistung'),
-                      items:
-                          const [
-                                'Komplettaufbereitung',
-                                'Innenraumaufbereitung',
-                                'Außenaufbereitung',
-                                'Verkaufsaufbereitung',
-                                'Leasingrückläufer',
-                                'Sonderleistung',
-                              ]
-                              .map(
-                                (value) => DropdownMenuItem(
-                                  value: value,
-                                  child: Text(value),
-                                ),
-                              )
-                              .toList(),
+                      items: serviceTypes
+                          .map(
+                            (value) => DropdownMenuItem(
+                              value: value,
+                              child: Text(value),
+                            ),
+                          )
+                          .toList(),
                       onChanged: (value) =>
                           setState(() => _serviceType = value!),
                     ),
                     const SizedBox(height: 16),
-                    OutlinedButton.icon(
-                      onPressed: () async {
-                        final selected = await showDatePicker(
-                          context: context,
-                          initialDate: DateTime.now().add(
-                            const Duration(days: 1),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: _pickDate,
+                            icon: const Icon(Icons.calendar_month_outlined),
+                            label: Text(
+                              _date == null
+                                  ? 'Wunschdatum'
+                                  : '${_date!.day.toString().padLeft(2, '0')}.${_date!.month.toString().padLeft(2, '0')}.${_date!.year}',
+                            ),
                           ),
-                          firstDate: DateTime.now(),
-                          lastDate: DateTime.now().add(
-                            const Duration(days: 365),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: _pickTime,
+                            icon: const Icon(Icons.schedule_outlined),
+                            label: Text(
+                              _time == null
+                                  ? 'Wunschzeit'
+                                  : '${_time!.hour.toString().padLeft(2, '0')}:${_time!.minute.toString().padLeft(2, '0')} Uhr',
+                            ),
                           ),
-                        );
-                        if (selected != null) {
-                          setState(() => _date = selected);
-                        }
-                      },
-                      icon: const Icon(Icons.calendar_month_outlined),
-                      label: Text(
-                        _date == null
-                            ? 'Wunschtermin auswählen'
-                            : '${_date!.day.toString().padLeft(2, '0')}.${_date!.month.toString().padLeft(2, '0')}.${_date!.year}',
-                      ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 16),
                     TextFormField(
@@ -217,9 +237,11 @@ class _NewAppointmentScreenState extends State<NewAppointmentScreen> {
                     ),
                     const SizedBox(height: 24),
                     ElevatedButton.icon(
-                      onPressed: _save,
+                      onPressed: _saving ? null : _save,
                       icon: const Icon(Icons.add_task_rounded),
-                      label: const Text('Termin anlegen'),
+                      label: Text(
+                        _saving ? 'Wird gespeichert …' : 'Termin anlegen',
+                      ),
                     ),
                   ],
                 ),
@@ -231,6 +253,46 @@ class _NewAppointmentScreenState extends State<NewAppointmentScreen> {
     ),
   );
 
+  Future<void> _pickDate() async {
+    final selected = await showDatePicker(
+      context: context,
+      initialDate: _date ?? DateTime.now().add(const Duration(days: 1)),
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+    );
+    if (selected != null) setState(() => _date = selected);
+  }
+
+  Future<void> _pickTime() async {
+    final selected = await showTimePicker(
+      context: context,
+      initialTime: _time ?? const TimeOfDay(hour: 9, minute: 0),
+    );
+    if (selected != null) setState(() => _time = selected);
+  }
+
   String? _required(String? value) =>
       (value?.trim().isEmpty ?? true) ? 'Pflichtfeld' : null;
+}
+
+class _SelectedCompany extends StatelessWidget {
+  const _SelectedCompany({required this.name});
+  final String name;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: FncColors.gold.withValues(alpha: .08),
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: FncColors.line),
+    ),
+    child: Row(
+      children: [
+        const Icon(Icons.business_outlined, color: FncColors.gold),
+        const SizedBox(width: 12),
+        Text(name, style: const TextStyle(fontWeight: FontWeight.w700)),
+      ],
+    ),
+  );
 }

@@ -9,29 +9,32 @@ Authentication, or required backend configuration.
 ## Features
 
 - Start screen with FNC Admin and Autohaus roles
-- Admin can view all appointments and manage their status
+- Admin can view all appointments, manage their status and use a weekly view
 - Autohaus can create requests and see only requests from its current session
 - Autohaus companies are stored persistently in Firestore collection
   `autohaeuser`
 - Existing Autohaus companies can be selected from a saved list
 - Duplicate company names are prevented through normalized document IDs
 - Both portals can return to role selection
-- Create, view, filter, update and delete appointments in admin mode
-- Local in-memory appointment storage with demonstration data
+- Create, view, filter, update and delete Firestore appointments
+- Wunschdatum and Wunschzeit with chronological sorting
+- Separate Terminart and Leistung fields
+- Admin metrics for today, this week and workflow status
+- “Heutige Fahrzeuge” overview
 - Status workflow:
   `Angefragt`, `Bestätigt`, `In Arbeit`, `Fertig`, `Abgeholt`, `Abgerechnet`
 - Responsive premium German automotive interface
 - Android, iOS, Web and Windows Flutter targets
 - Firebase Hosting configuration for the compiled PWA
 
-Appointments still reset when the application restarts. Autohaus company names
-are persistent in Firestore with the fields `name`, `createdAt` and
-`lastUsedAt`.
+Appointments are stored in Firestore collection `appointments`. Autohaus
+company names are persistent in `autohaeuser` with the fields `name`,
+`createdAt` and `lastUsedAt`.
 
 Deploy the included Firestore rules before using the no-login prototype:
 
 ```bash
-firebase deploy --only firestore:rules
+firebase deploy --only firestore
 ```
 
 ## Development
