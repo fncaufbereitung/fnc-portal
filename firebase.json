@@ -1,0 +1,32 @@
+{
+  "hosting": {
+    "public": "build/web",
+    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+    "rewrites": [{"source": "**", "destination": "/index.html"}]
+  },
+  "firestore": {
+    "rules": "firestore.rules"
+  },
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "fnc-portal-bd8fd",
+          "appId": "1:1076765477922:android:e8d931c9d0c66302908e7b",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "fnc-portal-bd8fd",
+          "configurations": {
+            "android": "1:1076765477922:android:e8d931c9d0c66302908e7b",
+            "ios": "1:1076765477922:ios:058b4c46a30bceac908e7b",
+            "web": "1:1076765477922:web:a19e89c52fbfba86908e7b",
+            "windows": "1:1076765477922:web:51e77cd951a84556908e7b"
+          }
+        }
+      }
+    }
+  }
+}
